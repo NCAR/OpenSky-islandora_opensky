@@ -1,0 +1,93 @@
+<?php
+
+// Includes functions to create Islandora Solr blocks.
+require_once dirname(__FILE__) . '/includes/blocks.inc';
+require_once dirname(__FILE__) . '/includes/utilities.inc';
+// require_once dirname(__FILE__) . '/theme/theme.inc';
+
+/**
+ * Implements hook_menu().
+ */
+function opensky_menu () {
+    $items = array();
+    $items['opensky/scratch'] = array(
+        'title' => 'OpenSky Scratch',
+        'page callback' => 'opensky_scratch',
+        'access callback' => TRUE,
+        'expanded' => TRUE,
+    );
+    return $items;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function opensky_theme() {
+    $path = drupal_get_path('module', 'opensky');
+    $file = 'theme.inc';
+    return array (
+        'opensky_scratch' => array (
+            'path' => $path . '/theme',
+            'file' => $file,
+            'template' => 'opensky-scratch',
+            'variables' => array ('pid' => null),
+        ),
+        'opensky_search_collection_info' => array (
+            'path' => $path . '/theme',
+            'file' => $file,
+            'template' => 'opensky-search-collection-info',
+            'variables' => array (
+                'collection_pid' => NULL,
+                'collection_title' => NULL,
+                'collection_description' => NULL
+            ),
+        ),
+        'opensky_in_collections' => array(
+            'path' => $path . '/theme',
+            'file' => $file,
+            'template' => 'opensky-in-collections',
+            'variables' => array (
+                'parent_collections' => NULL,
+            ),
+        ),
+        'opensky_advanced_search' => array(
+            'path' => $path . '/theme',
+            'file' => $file,
+            'template' => 'opensky-advanced-search',
+            'variables' => array (
+                'collection_pid' => NULL,
+            ),
+        ),
+        'opensky_collection_picker_data' => array (
+            'path' => $path . '/theme',
+            'file' => $file,
+            'template' => 'opensky-collection-picker-data',
+            'variables' => array (
+                'option_data' => NULL,
+            ),
+        ),
+    );
+}
+
+/**
+ * Implements hook_help().
+ */
+function opensky_help($path, $arg) {
+
+    if ($path == 'admin/help#opensky') {
+        $output = '<h3>' . t('About') . '</h3>';
+        $output .= '<p>' . t('The opensky module provides extensions and customization to Islandora core modules.') . '</p>';
+        return $output;
+    }
+}
+
+/**
+ * Provide content for the opensky/scratch page (via opensky_scratch theme)
+ */
+function opensky_scratch() {
+
+    $defaultpid = 'archives:hao';
+    $pid = isset($_GET['pid']) ? $_GET['pid'] : $default_pid;
+
+    return theme('opensky_scratch', array('pid' => $pid));
+}
