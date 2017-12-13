@@ -136,7 +136,8 @@ function opensky_search_collection_info() {
 //    dsm('query: '.$query .' ('. strlen($query) .')');
 
     if (isset($params['collection'])) {
-        if (!$query) {
+        // Decided to always show collection info - opensky-dev 12/13/17 
+        if (true || !$query) {
             $collection = $params['collection'];
 
             $title = $description = '';
@@ -152,7 +153,7 @@ function opensky_search_collection_info() {
             ));
         } else {
             $output = '<div id="opensky-search-collection-info-OFF" style="text-align:right;background:white;">';
-            $output .= l('collection home', '/islandora/object/'.$params['collection']);
+            $output .= l('Collection home', '/islandora/object/'.$params['collection']);
             $output .= '</div>';
         }
     }
@@ -219,8 +220,8 @@ function opensky_browse_collection_search_form() {
  * Create form for "search this collection"
  */
 function get_opensky_search_collection_form($collection_pid) {
-//    dsm ('get_opensky_search_collection_form');
-//    dsm (request_uri());
+    //    dsm ('get_opensky_search_collection_form');
+    // dsm (request_uri());
     $form = array(
         '#type' => 'container',
         '#attributes' => array(
@@ -319,7 +320,7 @@ function opensky_simple_search_form($form, &$form_state) {
     );
     $form['simple']['submit'] = array(
         '#type' => 'submit',
-        '#value' => t('search'),
+        '#value' => t('  Go  '),
     );
     return $form;
 }
