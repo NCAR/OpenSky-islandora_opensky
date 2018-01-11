@@ -18,4 +18,4 @@
         COLLECTION_SELECT_OPTIONS["<?php print $key ?>"] = "<?php print $value ?>";
     <? endforeach ?>
 </script>
-<div style="font-size:9pt;color:gray">hello from opensky-collection-picker</div>
+
