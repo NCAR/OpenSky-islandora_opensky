@@ -593,8 +593,8 @@ function opensky_form_opensky_advanced_search_form_alter(&$form, &$form_state, $
      * @see opensky_advanced_search_form()
  */
 function _opensky_advanced_search_terms($form, &$form_state) {
-    dsm('_opensky_advanced_search_terms');
-    dsm($form_state);
+    // dsm('_opensky_advanced_search_terms');
+    // dsm($form_state);
     return $form['terms'];
 }
 
