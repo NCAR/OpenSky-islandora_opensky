@@ -17,6 +17,15 @@
 
 <div id="opensky-search-collection-info">
 <!-- <div style="font-size:8pt">opensky-search-collection-info</div> -->
+
+  <?php if (user_is_logged_in()): ?>
+    <div class="tabs-wrapper" style="margin:0px;padding-top:1px;">
+      <ul class="tabs primary">
+        <li><a href="#overlay=islandora/object/<?php print $variables['collection_pid']; ?>/manage">Manage</a></li>
+      </ul>
+    </div>
+  <?php endif; ?>
+
     <h1 class="title" style="text-decoration:underline;">
         <?php print $variables['collection_title']; ?>
     </h1>
