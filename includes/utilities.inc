@@ -67,7 +67,7 @@ function opensky_get_dc_array ($pid) {
     $dc = $fedora_object['DC'];
     $dc_object = DublinCore::importFromXMLString($dc->content);
     $dc_array = $dc_object->asArray();
-    $title = $dc_array['dc:title']['value'];
+    // $title = $dc_array['dc:title']['value'];
     return $dc_array;
 }
 
@@ -303,7 +303,7 @@ function opensky_collection_breadcrumb($params) {
     //    module_load_include('inc', 'opensky', 'includes/utilities');
     $collection = $params['collection'];     
     $dc_array = opensky_get_dc_array($collection);
-    $filter_string = $dc_array['dc:title']['value'];
+    $filter_string = html_entity_decode($dc_array['dc:title']['value']);
     
     // Remove filter array for collection breadcrumb link
     $query = array();

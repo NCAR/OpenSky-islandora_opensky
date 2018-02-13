@@ -101,7 +101,7 @@ function get_collection_select_options_js () {
      if ($parent_pid != 'opensky:root') {
          $dc_array = opensky_get_dc_array($parent_pid);
          if ($dc_array != null) {
-             $title = $dc_array['dc:title']['value'];
+             $title = html_entity_decode($dc_array['dc:title']['value']);
              $option_data[$parent_pid] = opensky_truncate($title);
          }
      }
