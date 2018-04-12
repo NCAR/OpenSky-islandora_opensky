@@ -9,7 +9,6 @@ function opensky_get_pid_from_request () {
     if (substr (request_path(), 0, strlen($pat)) != $pat) {
         return null;
     }
-
     $tail = array_pop(explode('/',request_path()));
     $parts = explode (':', $tail);
     if (count($parts) == 2) {
@@ -28,7 +27,6 @@ function opensky_get_search_term_from_request() {
     }
 
     $term = array_pop(explode('/',request_path()));
-//    dsm("term: $term");
     return trim($term);
 }
 
@@ -76,14 +74,22 @@ function opensky_get_dc_array ($pid) {
  *
  */
 function opensky_get_pid_subcollections_pids ($parent_pid) {
-    //    module_load_include('inc', 'islandora_basic_collection', 'includes/utilities');
-    $obj = opensky_get_fedora_object($parent_pid);
-    if ($obj != null) {
-        return opensky_get_obj_subcollection_pids($obj);
+
+    $key = 'subcollections_pids_'.$parent_pid;
+    if ($cache = cache_get($key)) {
+        $pids = $cache->data;
     }
     else {
-        return array();
+        $obj = opensky_get_fedora_object($parent_pid);
+        if ($obj != null) {
+            $pids =  opensky_get_obj_subcollection_pids($obj);
+        } else {
+            $pids = array();
+        }
+
+        cache_set ($key, $pids);
     }
+    return $pids;
 }
 
 /**
@@ -98,14 +104,23 @@ function opensky_get_pid_subcollections_pids ($parent_pid) {
  */
 
 function opensky_get_subcollections_recursive($parent_pid){
-    $ret = array($parent_pid);
-    $children = opensky_get_pid_subcollections_pids($parent_pid);
-    if (count($children)) {
-        foreach ($children as $child) {
-            $ret = array_merge($ret, opensky_get_subcollections_recursive($child));
+
+    $key = 'subcollections_recursive_'.$parent_pid;
+
+    if ($cache = cache_get($key)) {
+        $subs = $cache->data;
+    } else {
+        $subs = array($parent_pid);
+        $children = opensky_get_pid_subcollections_pids($parent_pid);
+        if (count($children)) {
+            foreach ($children as $child) {
+                $subs = array_merge($subs, opensky_get_subcollections_recursive($child));
+            }
         }
+        cache_set($key, $subs);
     }
-    return $ret;
+
+    return $subs;
     
 }
 
@@ -122,9 +137,8 @@ function opensky_get_obj_subcollection_pids(AbstractObject $object) {
     $get_pid = function($o) {
         return $o['pid'];
     };
-    // return array_map($get_pid, opensky_get_subcollection_infos ($object));
-    $ret = array_map($get_pid, opensky_get_obj_subcollection_infos ($object));
-    return $ret;
+
+    return array_map($get_pid, opensky_get_obj_subcollection_infos ($object));
 }
 
 function opensky_is_item_pid($pid) {
@@ -160,6 +174,7 @@ function opensky_has_subcollections ($pid) {
  */
 function opensky_get_obj_subcollection_infos(AbstractObject $object) {
     module_load_include('inc', 'islandora_basic_collection', 'includes/utilities');
+
     $params = array(
         'object' => $object,
         'page_size' => -1,
@@ -179,14 +194,23 @@ function opensky_get_obj_subcollection_infos(AbstractObject $object) {
 }
 
 function opensky_get_pid_subcollection_infos ($parent_pid) {
-    //    module_load_include('inc', 'islandora_basic_collection', 'includes/utilities');
-    $obj = opensky_get_fedora_object($parent_pid);
-    if ($obj != null) {
-        return opensky_get_obj_subcollection_infos($obj);
+
+    $key = 'subollection_infos_'.$parent_pid;
+
+    if ($cached = cache_get($key)) {
+        $infos = $cached->data;
+    } else {
+        $obj = opensky_get_fedora_object($parent_pid);
+        if ($obj != null) {
+            $infos = opensky_get_obj_subcollection_infos($obj);
+        }
+        else {
+            $infos = array();
+        }
+        cache_set ($key, $infos);
     }
-    else {
-        return array();
-    }
+
+    return $infos;
 }
 
 
@@ -303,7 +327,7 @@ function opensky_collection_breadcrumb($params) {
     //    module_load_include('inc', 'opensky', 'includes/utilities');
     $collection = $params['collection'];     
     $dc_array = opensky_get_dc_array($collection);
-    $filter_string = html_entity_decode($dc_array['dc:title']['value']);
+    $filter_string = $dc_array['dc:title']['value'];
     
     // Remove filter array for collection breadcrumb link
     $query = array();
