@@ -16,6 +16,6 @@
     var COLLECTION_SELECT_OPTIONS = {};
     <?php foreach ($option_data as $key => $value): ?>
         COLLECTION_SELECT_OPTIONS["<?php print $key ?>"] = "<?php print $value ?>";
-    <? endforeach ?>
+    <?php endforeach ?>
 </script>
 
