@@ -47,7 +47,7 @@ function opensky_get_fedora_object($pid) {
     try {
         return $repository->getObject($pid);
     } catch (Exception $e) {
-        dsm ('object ('.$pid.') not in repository');
+        // dsm ('object ('.$pid.') not in repository');
         return null;
     }
 }
@@ -58,7 +58,7 @@ function opensky_get_fedora_object($pid) {
 function opensky_get_dc_array ($pid) {
     $fedora_object = opensky_get_fedora_object($pid);
     if ($fedora_object == null) {
-        dsm ('object ('.$pid.') not in repository');
+        // dsm ('object ('.$pid.') not in repository');
         return null;
     }
 
@@ -386,7 +386,7 @@ function opensky_get_in_collections_display ($object) {
  */
 /*
 function opensky_get_subcollections ($parent_arg, $recursive=false) {
-    dsm('opensky_get_subcollections: $parent is a '.gettype($parent_arg));
+    // dsm('opensky_get_subcollections: $parent is a '.gettype($parent_arg));
     $parent_obj = null;
     switch (gettype ($parent_arg)) {
         case 'string':
@@ -399,9 +399,9 @@ function opensky_get_subcollections ($parent_arg, $recursive=false) {
             $parent_obj = opensky_get_fedora_object($parent_arg['pid']);
             break;
         default:
-            dsm('parent_arg not handled');
+            // dsm('parent_arg not handled');
     }
-    dsm($parent_obj);
+    
     $ret = array (opensky_collection_obj_to_info ($parent_obj));
     $children = opensky_get_subcollection_infos ($parent_obj);
     if ($recursive) {
