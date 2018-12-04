@@ -20,9 +20,10 @@
 
 </script>
 
+<script>
 // Below is orgNav code that used to be inserted as a separate block but that
 // stopped working around 11/13 for unknown reasons ...
-<script>
+
 // CUSTOM VARIABLES
 var contactLink = "mailto:ogg@ucar.edu";     // enter your Webmaster/Feedback
                                              // link. Include http:// or mailto:
