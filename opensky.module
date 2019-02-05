@@ -3,6 +3,7 @@
 // Includes functions to create Islandora Solr blocks.
 require_once dirname(__FILE__) . '/includes/blocks.inc';
 require_once dirname(__FILE__) . '/includes/utilities.inc';
+require_once dirname(__FILE__) . '/includes/doi_importer.inc';
 // require_once dirname(__FILE__) . '/theme/theme.inc';
 
 /**
