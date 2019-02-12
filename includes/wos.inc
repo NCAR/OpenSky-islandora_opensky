@@ -16,7 +16,7 @@
  */
 
 function opensky_doi_get_wos_response($id) {
-    print 'getting WOS DATA from web ..';
+    // dpm ('getting WOS DATA from web ..');
     $auth_url = "http://search.webofknowledge.com/esti/wokmws/ws/WOKMWSAuthenticate?wsdl";
 
     try {
@@ -66,7 +66,6 @@ function opensky_doi_get_wos_response($id) {
                 array('name' => 'Date', 'sort' => 'D')
             ),
             'firstRecord' => '1',
-//            'viewField' => array('collectionName' => 'WOS', 'fieldName' => 'abstract')
             'viewField' => array('collectionName' => 'WOS', 'fieldName' => array ('abstract', 'grants'))
         )
     );
@@ -88,8 +87,8 @@ function opensky_doi_get_wos_response($id) {
 
 
 /*
- * Return XML String
- * DOI not used for this canned version ....
+ * Debugging function. Returns XML String
+ * $doi param not used for this canned version ....
  */
 function opensky_doi_get_canned_wos_response ($doi) {
 //    $path = '/Users/ostwald/tmp/WOS_DATA.xml';
@@ -114,7 +113,7 @@ function add_wos_abstract_to_mods ($mods, $abstract) {
  * otherwise gets canned WOS XML (for debugging).
  */
 function opensky_get_wos_dom ($doi) {
-
+    //    dpm ("opensky_get_wos_dom ($doi)");
     if ($doi) {
         $wos_xml_source = opensky_doi_get_wos_response($doi);
     } else {
@@ -123,7 +122,7 @@ function opensky_get_wos_dom ($doi) {
 
     $wos_xml = new DOMDocument('1.0');
     if (!$wos_xml->loadXML($wos_xml_source)) {
-        print "WOS load FAILED\n";
+        error_log("WOS load FAILED\n");
         return FALSE;
     }
 
@@ -131,7 +130,7 @@ function opensky_get_wos_dom ($doi) {
 }
 
 /*
- * Extract information obtained from WOS webservice response
+ * Extract information obtained from WOS webservice response.
  * provided $wos_xml is an XML string
  * - abstract text
  * - award_ids as array
@@ -143,9 +142,8 @@ function opensky_get_wos_data ($wos_xml) {
     $xpath->registerNamespace("ns", $wos_xml->documentElement->namespaceURI);
     $nodes = $xpath->query("//ns:abstract_text/ns:p");
 
-
     if (is_null($nodes)) {
-        print 'Abstract not found in WOS_XML';
+        error_log ('Abstract not found in WOS_XML');
     } else {
         $wos_abstract_node = $nodes->item(0);
 

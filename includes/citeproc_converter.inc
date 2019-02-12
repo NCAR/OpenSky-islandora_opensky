@@ -5,50 +5,26 @@
  * Convert mods data into JSON for citeproc-js.
  */
 
-
 /**
- * Add the MODS namespace to the given element, if it isn't already there.
- */
-function add_mods_namespace(SimpleXMLElement &$mods) {
-  static $used_namespace = NULL;
-  static $mods_namespace = 'http://www.loc.gov/mods/v3';
-
-  $namespaces = $mods->getNamespaces();
-
-  if (is_null($used_namespace)) {
-    // The namespace is there; possibly default, though.
-    if (array_search($mods_namespace, $namespaces) !== FALSE) {
-      $used_namespace = $mods_namespace;
-    }
-    else {
-      $used_namespace = '';
-    }
-  }
-
-  if (array_key_exists('mods', $namespaces) === FALSE) {
-    $mods->registerXPathNamespace('mods', $used_namespace);
-  }
-}
-
-/**
- * Perform a number of XPath queries to extract CSL info.
+ * Perform XPath queries to extract CSL info from provided $mods.
  *
- * Despite name, actually returns a PHP array. Run results through
- * _citeproc_array_to_object() before passing off to CiteProc-PHP.
- *
- * @param mixed $mods_in
- *   Either a DOMNode or a string representing a MODS record.
- *
- * @return array
+ * This function is called after islandora_scholar module converter.inc
+ * has built the $output array, which is modified with opensky-specific
+ * attributes.
+ * @param array $output
  *   An associative array mapping CSL variable names to values we have
  *   extracted for them from the provided MODS record.
+ *
+ * @param SimpleXMLElement $mods
+ *   Either a DOMNode or a string representing a MODS record.
+ *
  */
 function opensky_convert_mods_to_citeproc_jsons_alter(array &$output, SimpleXMLElement $mods) {
-
+    
   if ($mods instanceof SimpleXMLElement) {
       add_mods_namespace($mods);
 
-      $gtype = convert_mods_to_citeproc_json_genre($mods);
+      $gtype = opensky_convert_mods_to_citeproc_json_genre($mods);
       switch (trim($gtype)) {
           case 'paper-conference': {
               $container_title = convert_mods_to_citeproc_json_query($mods, '//mods:mods[1]/mods:name[@type="conference"]/mods:namePart');
@@ -61,22 +37,55 @@ function opensky_convert_mods_to_citeproc_jsons_alter(array &$output, SimpleXMLE
 
       // replace selected values with opensky values
       $output['container-title'] = $container_title;
-
       $output['volume'] = (int)convert_mods_to_citeproc_json_query($mods, '//mods:mods[1]/mods:relatedItem[@type="host"]/mods:part/mods:detail[@type="volume"]/mods:number');
-
       $output['issue'] = (int)convert_mods_to_citeproc_json_query($mods, variable_get('islandora_scholar_xpaths_issue', '//mods:mods[1]/mods:part/mods:detail[@type="issue"]/mods:number'));
-
       $output['publisher'] = opensky_convert_mods_to_citeproc_json_publisher($mods);
-
       $output['publisher-place'] = opensky_convert_mods_to_citeproc_json_publisher_place($mods);
       $output['URL'] = convert_mods_to_citeproc_json_query($mods, variable_get('islandora_scholar_xpaths_URL', '//mods:mods[1]/mods:location/mods:url'));
+      $output['page'] = opensky_convert_mods_to_citeproc_json_page($mods);
       $output['number'] = opensky_convert_mods_to_citeproc_json_number($mods);
       $output['number-of-pages'] = convert_mods_to_citeproc_json_query($mods, '//mods:mods[1]/mods:part/mods:extent[@unit="pages"]/mods:total');
-      $output['type'] = convert_mods_to_citeproc_json_genre($mods);
+      $output['type'] = opensky_convert_mods_to_citeproc_json_genre($mods);
   }
-
 }
 
+/**
+ * Gets the page property for the Citation.
+ *
+ * @param SimpleXMLElement $mods
+ *   A MODS document.
+ *
+ * @return string
+ *   The page property for the Citation.
+ */
+function opensky_convert_mods_to_citeproc_json_page(SimpleXMLElement $mods) {
+    $output = NULL;
+    $article_number = convert_mods_to_citeproc_json_query($mods, '//mods:mods[1]/mods:relatedItem[@type="host"]/mods:part/mods:detail[@type="citation/article"]/mods:number');
+    //    if (isset($article_number)) {
+    //        $output = $article_number;
+    //    } else {
+    $pages = $mods->xpath("//mods:mods[1]/mods:relatedItem/mods:part/mods:extent[@unit='page']");
+    // Note: "pages" is correct, but Zotero uses "page".
+    if (empty($pages)) {
+        $pages = $mods->xpath("//mods:mods[1]/mods:relatedItem/mods:part/mods:extent[@unit='pages']");
+    }
+    if (isset($pages[0]->list) || isset($pages[0]->start)) {
+        if (!empty($pages[0]->list)) {
+            $output = (string) $pages[0]->list;
+        } elseif (!empty($pages[0]->start)) {
+            $output = (string) $pages[0]->start;
+            if (!empty($pages[0]->end)) {
+                $output .= "-" . $pages[0]->end;
+            }
+        }
+    } elseif (isset($article_number)) {
+        $output = $article_number;
+    } elseif (!empty($pages[0]->total)) {
+        $output = (string) $pages[0]->total . " pp";
+    }
+    //    }
+    return $output;
+}
 
 function opensky_convert_mods_to_citeproc_json_number(SimpleXMLElement $mods) {
     $genre = trim(convert_mods_to_citeproc_json_query($mods, '//mods:mods[1]/mods:genre'));
@@ -102,7 +111,7 @@ function opensky_convert_mods_to_citeproc_json_number(SimpleXMLElement $mods) {
  */
 function opensky_convert_mods_to_citeproc_json_publisher(SimpleXMLElement $mods) {
 
-    $gtype = convert_mods_to_citeproc_json_genre($mods);
+    $gtype = opensky_convert_mods_to_citeproc_json_genre($mods);
     switch (trim($gtype)) {
         case 'paper-conference': {
             $publisher = convert_mods_to_citeproc_json_query($mods, '//mods:mods[1]/mods:originInfo/mods:place/mods:placeTerm[@type="text"]');
@@ -134,7 +143,7 @@ function opensky_convert_mods_to_citeproc_json_publisher(SimpleXMLElement $mods)
  */
 function opensky_convert_mods_to_citeproc_json_publisher_place(SimpleXMLElement $mods) {
 
-    $gtype = convert_mods_to_citeproc_json_genre($mods);
+    $gtype = opensky_convert_mods_to_citeproc_json_genre($mods);
     switch (trim($gtype)) {
         case 'paper-conference': {
             $publisher_place = convert_mods_to_citeproc_json_query($mods, '//mods:mods[1]/mods:name[@type="corporate"]/mods:namePart');
@@ -160,7 +169,7 @@ function opensky_convert_mods_to_citeproc_json_publisher_place(SimpleXMLElement 
  * @return string
  *   The JSON repersentation of the MODS genre.
  */
-function convert_mods_to_citeproc_json_genre($mods) {
+function opensky_convert_mods_to_citeproc_json_genre($mods) {
     $genre = convert_mods_to_citeproc_json_query($mods, variable_get('islandora_scholar_xpaths_genre', '//mods:mods[1]/mods:genre'));
     switch (trim($genre)) {
         case 'journal article':
@@ -204,7 +213,7 @@ function convert_mods_to_citeproc_json_genre($mods) {
  * @return string
  *   The first results of the query if found NULL otherwise.
  */
-function convert_mods_to_citeproc_json_query(SimpleXMLElement $mods, $path) {
+function opensky_convert_mods_to_citeproc_json_query(SimpleXMLElement $mods, $path) {
     $property = $mods->xpath($path);
     return !empty($property) ? (string) $property[0] : NULL;
 }
@@ -220,7 +229,7 @@ function convert_mods_to_citeproc_json_query(SimpleXMLElement $mods, $path) {
  */
 function convert_mods_to_citeproc_json_publisher(SimpleXMLElement $mods) {
 
-    $gtype = convert_mods_to_citeproc_json_genre($mods);
+    $gtype = opensky_convert_mods_to_citeproc_json_genre($mods);
     switch (trim($gtype)) {
         case 'paper-conference': {
             $publisher = convert_mods_to_citeproc_json_query($mods, '//mods:mods[1]/mods:originInfo/mods:place/mods:placeTerm[@type="text"]');

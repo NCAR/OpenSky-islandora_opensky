@@ -1,7 +1,5 @@
 <?php
 
-
-
 /*
  * Implements hook_islandora_doi_content_type_info_alter
  *
@@ -13,11 +11,11 @@ function opensky_islandora_doi_content_type_info_alter (array &$info) {
     $info[$crossref_type]['translator'] = 'opensky_crossref_translator';
 }
 
-
 /**
  * Implements callback_islandora_doi_translator() for CrossRef data.
  *
- * This function is based on islandora_scholar module's islandora_doi_crossref_translator.
+ * This function is (very closely) based on islandora_scholar module's
+ * islandora_doi_crossref_translator.
  */
 function opensky_crossref_translator ($crossref_data) {
     // Parse the source into a DOMDocument.
@@ -404,19 +402,10 @@ function opensky_crossref_translator ($crossref_data) {
                                                 $doi_text = $mods->importNode($identifier->firstChild);
                                                 $doi->appendChild($doi_text);
 
-//                                                echo "- doi: $doi_text \n";
-//
-//                                                try {
-//                                                    $abstract_text = opensky_doi_get_abstract($doi->nodeValue);
-//                                                } catch (Exception $e) {
-//                                                    error_log('WARN: doi importer could not get abstract: ' . $e->getMessage());
-//                                                }
-//
-//                                                if ($abstract_text) {
-//                                                    $abstract = $mods->createElement('abstract');
-//                                                    $abstract->nodeValue = $abstract_text;
-//                                                    $mods->firstChild->appendChild($abstract);
-//                                                }
+                                                // assign $doi so we can use it
+                                                // in post processor
+                                                $doi = $doi_text->nodeValue;
+                                                dpm ('doi: ' . $doi);
                                             }
                                             break;
 
@@ -556,20 +545,20 @@ function opensky_crossref_translator ($crossref_data) {
         }
 
         // Return after first instance.
+
+        /* Post processor - and maybe some day using a hook_alter structure.
+           
+           for now, we will cheat a littlb by using global variables to cache
+           info from the crossRef parse.
+           
+           DOI
+           AWARD_IDS
+        */
+
+        opensky_translator_post_processor ($doi, $mods, $crossref_xml);
+        
+        return $mods;
     }
-
-    /* Post processor - and maybe some day using a hook_alter structure.
-
-        for now, we will cheat a littlb by using global variables to cache
-        info from the crossRef parse.
-
-        DOI
-        AWARD_IDS
-    */
-
-        post_processor ($mods, $crossref_xml);
-
-    return $mods;
 
     return FALSE;
 }
@@ -578,24 +567,51 @@ function opensky_crossref_translator ($crossref_data) {
  * @param $mods - a DOMDocument
  * @param $crossref - a DOMDocument
  */
-function opensky_translator_post_processor (&$mods, $crossref) {
+function opensky_translator_post_processor ($doi, $mods, $crossref) {
+    dpm ('opensky_translator_post_processor');
 
+    /*
+
+     WTF??? I could never extract the DOI from the $mods DOMDocument. 
+     No idea why. Finally i just passed as param. (but i didn't want
+     to because I wanted to set this up as an alter ...)
+    
+    dpm ('mods is a '. get_class($mods));
     // get the doi from the crossref dom
     $xpath = new DOMXpath($mods);
     $xpath->registerNamespace("ns", $mods->documentElement->namespaceURI);
     $nodes = $xpath->query("//ns:identifier[@type='doi']");
 
-    if (is_null($nodes)) {
-        print 'DOI not found in MODS';
+    dpm ('FOUND '. $nodes->length . ' nodes');
+
+    if (empty($nodes) || $nodes->length == 0) {
+        dpm( 'DOI not found in MODS');
+        error_log( 'DOI not found in MODS');
         return;
     }
+
     $mods_doi_node = $nodes->item(0);
+    if ($mods_doi_node) {
+        dpm ('mods_doi_node');
+        dpm ($mods_doi_node->saveXML());
+        if ($doi) {
+            $doi = $mods_doi_node->nodeValue;
+            error_dpm ("DOI: $doi\n");
+        } else {
+            dpm ("DOI NOT FOUND");
+            return;
+        }
+    }
+    else {
+        dpm ("never found node - BAILING");
+        return;
+    }
+    */
 
-    $doi = $mods_doi_node->nodeValue;
-    print ("DOI: $doi\n");
+    $wos_dom = opensky_get_wos_dom ($doi); 
+    dpm ('wos_dom');
+    dpm ($wos_dom);
 
-
-    $wos_dom = opensky_get_wos_dom (null); // for prod we pass $doi here
     $wos_data = opensky_get_wos_data ($wos_dom);
 
     // insert ABSTRACT into MODS
@@ -603,44 +619,41 @@ function opensky_translator_post_processor (&$mods, $crossref) {
 
     // get crossref award ids
     $crossref_award_ids = array();
-    if (true) {
-        // get award_ods from crossref
-        $xpath = new DOMXpath($crossref);
-        $selector = "//program/assertion/assertion[@name='award_number']";
-        $nodes = $xpath->query($selector);
 
-        if (is_null($nodes)) {
-            print 'award_id not found in CROSSREF';
-            return;
-        } else {
-            foreach ($nodes as $node) {
-                $crossref_award_ids[] = $node->nodeValue;
-            }
+    // get award_ids from crossref
+    $xpath = new DOMXpath($crossref);
+    $selector = "//program/assertion/assertion[@name='award_number']";
+    $nodes = $xpath->query($selector);
+    
+    if (is_null($nodes)) {
+        error_log('award_id not found in CROSSREF');
+        return;
+    } else {
+        foreach ($nodes as $node) {
+            $crossref_award_ids[] = $node->nodeValue;
         }
     }
 
     // merge and sort award_ids
     $merged_award_ids = array_unique(array_merge($crossref_award_ids, $wos_data['award_ids']));
-
     // $merged_award_ids[] = 'FA9550-16-1-0050';  // one that we KNOW will validate just to test
-
     asort($merged_award_ids);
 
     $validated_award_ids = array();
     foreach ($merged_award_ids as $award_id) {
-        $resp = get_kuail_award_info ($award_id);
+        $resp = get_kuali_award_info ($award_id);
         if ($resp) $validated_award_ids[] = $award_id;
     }
 
     foreach($validated_award_ids as $award_id) {
-        // insert into MODS (but what is the structure??)
-        print ("inserting $award_id...\n");
+        // insert into MODS (but what is the desired structure??)
+        error_log ("inserting $award_id...\n");
         $award_node = $mods->createElement('note');
         $award_node->setAttribute('type','funding');
         $award_node->nodeValue = $award_id;
         $mods->firstChild->appendChild($award_node);
     }
 
-    print ($mods->saveXML());
+    //    dpm ($mods->saveXML());
 
 }

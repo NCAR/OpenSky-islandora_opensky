@@ -12,7 +12,7 @@
  * there is a single hit returned by kuali API.
  * othewise, returns null.
  */
-function get_kuail_award_info ($award_id) {
+function get_kuali_award_info ($award_id) {
     $kuali_resp = get_kuali_response($award_id);
     if (!is_array($kuali_resp)) {
         return null;
@@ -24,7 +24,7 @@ function get_kuail_award_info ($award_id) {
 }
 
 /*
- * returns kauli response for proviced $award_id as object or array
+ * returns kauli response for provided $award_id as object or array
  */
 function get_kuali_response($award_id) {
 
