@@ -260,22 +260,18 @@ function opensky_redirect_to_search_view ($pid) {
     ));
     drupal_goto('/islandora/search/',$options);
 }
-
 /**
- * hook to insert the collection link and x_link into the breadcrumbs (see
- * islandora_solr_search/includes/results->setBreadcrumbs()
-
-the PROBLEM with this alter is that we don't have access to the info we need
-(i.e., $params). So instead of using hook_alter we use conventional function
-(opensky_collection_breadcrumb) which we call from within setBreadcrumbs..
-
+ * IMplements hook_islandora_solr_query
+ *
+ * HARD-CODE fields returned by solr query to make solr responses smaller                                                           
+ * and thus avoid PHP Out of memory errors 
  */
-function opensky_islandora_breadcrumbs_alter(&$data, $context) {
-    if (!isset($_GET['collection'])) {
-        // dsm('no collection');
-        return;
-    }
-    $collection = $_GET['collection'];
+function opensky_islandora_solr_query($islandora_solr_query) {
+    //    dpm ('opensky_islandora_solr_query');
+    //    dpm ($islandora_solr_query);
+
+    $islandora_solr_query->solrParams['fl'] = 'PID,mods*,fgs*,dc.*,dsmd_DC*,keyDate*,RELS_EXT*,*Display*,fedora_datastreams_ms';
+
 }
 
 /**
@@ -285,6 +281,12 @@ function opensky_islandora_breadcrumbs_alter(&$data, $context) {
  */
 function opensky_islandora_solr_query_alter($qp) {
     // dsm('opensky_islandora_solr_query_alter');
+
+    // if sort is not set for search pages, then set it to keyDate desc
+    if (current_path() == ISLANDORA_SOLR_SEARCH_PATH  && !isset($qp->solrParams['sort'])) {
+        $qp->solrParams['sort'] = 'keyDate desc';
+    }
+
     if (isset($qp->internalSolrParams['collection'])) {
         $collection = $qp->internalSolrParams['collection'];
 
@@ -319,11 +321,48 @@ function opensky_islandora_solr_query_alter($qp) {
 }
 
 /**
+ * implements hook_islandora_solr_results_alter
+ *
+ * Set thumbnail for citationCModel objects to OpenSky custom image
+ * (BiblioCitOnly.png);
+ */
+function opensky_islandora_solr_results_alter(&$object_results, $query_processor) {
+
+    $default_path = drupal_get_path('module', 'islandora_solr') . '/images/defaultimg.png';
+    foreach ($object_results as $object_index => $object_result) {
+        if (isset ($object_results[$object_index]['thumbnail_url']) && $object_results[$object_index]['thumbnail_url'] == $default_path) {
+            if (strpos($object_results[$object_index]['content_models'][0], 'citationCModel') !== false) {
+                $object_results[$object_index]['thumbnail_url'] = drupal_get_path('module', 'opensky') . '/images/BiblioCitOnly.png';
+            }
+        }
+    }
+}
+
+/**
+ * hook to insert the collection link and x_link into the breadcrumbs (see
+ * islandora_solr_search/includes/results->setBreadcrumbs()
+
+the PROBLEM with this alter is that we don't have access to the info we need
+(i.e., $params). So instead of using hook_alter we use conventional function
+(opensky_collection_breadcrumb) which we call from within setBreadcrumbs..
+
+ */
+function opensky_islandora_breadcrumbs_alter(&$data, $context) {
+    // dpm ('opensky_islandora_breadcrumbs_alter');
+    if (!isset($_GET['collection'])) {
+        // dsm('no collection');
+        return;
+    }
+    $collection = $_GET['collection'];
+}
+
+
+/**
  * Called from islandora_solr_search/includes/results->setBreadcrumbs(), creates
  * the collection breadcrumb, which is inserted into breadcrumbs by the caller
  */
 function opensky_collection_breadcrumb($params) {
-
+    // dpm($params);
     //    module_load_include('inc', 'opensky', 'includes/utilities');
     $collection = $params['collection'];     
     $dc_array = opensky_get_dc_array($collection);
@@ -422,3 +461,68 @@ function opensky_page_alter(&$page) {
 //    dsm($_GET);
 //    dsm ($page);
 }
+
+/*
+ * implements hook_islandora_get_view_alter
+ * see islandora_scholar/includes/utilities islandora_scholar_get_view()
+ *
+ * Insert times viewed and times downloaded for islandora views
+ * Customize the Download PDF link slightly
+ */
+function opensky_islandora_scholar_get_view_alter(&$display, $object) {
+
+    if (module_exists('islandora_usage_stats')) {
+       module_load_include('inc', 'islandora_usage_stats', 'includes/db');
+        // using the view_count method from db.inc
+        $view_count = islandora_usage_stats_get_individual_object_view_count($object);
+        $ds_count = islandora_usage_stats_get_datastream_downloads_count($object);
+        $times_downloaded = 0;
+        if (array_key_exists('PDF',$ds_count)){
+            $times_downloaded = $ds_count['PDF'];
+        }
+        $display['view_count']['#markup'] =t("<br/>Times Viewed on OpenSky: $view_count <br/>" .
+                                             "Times Downloaded on OpenSky: $times_downloaded <br/> <br/>");
+        /* we have to assign view_count a weight that puts it inbetween
+           'preview' and 'pdf_download'
+           - the other #weight values are integers but the following seems to
+           work to put 'view_count' above 'pdf_download'
+           - note that using 'pdf_download''s exact weight also does the same thing ...
+        */
+        $display['view_count']['#weight'] = $display['pdf_download']['#weight'] - 0.5;
+    }
+
+    // Set text on download link for PDFs
+    if (isset ($display['pdf_download']['#markup'])) {
+        unset($display['pdf_download']['#title']);
+        $display['pdf_download']['#markup'] = t('Download ') . l(t('PDF'), 
+                                              "islandora/object/$object->id/datastream/PDF/download/citation.pdf") .
+                                            "<br/><br/>";
+    }
+}
+
+/**
+ * Add "in collection" link to metadata display.
+ */
+function opensky_islandora_scholar_get_metadata_display_alter (&$display, $object, $weight) {
+
+    if (variable_get('islandora_scholar_use_standard_metadata_display', FALSE)) {
+        module_load_include('inc', 'islandora', 'includes/metadata');
+        // Borrowing core JS for fieldsets.                                                                                              
+        drupal_add_js('misc/form.js');
+        drupal_add_js('misc/collapse.js');
+        $metadata = islandora_retrieve_metadata_markup($object);
+        $description = islandora_retrieve_description_markup($object);
+        $doi_link = islandora_retrieve_doi_markup($object);
+
+        // OpenSky - Insert 'in collections' display element from opensky                                                            
+        // module_load_include('inc', 'opensky', 'includes/utilities');
+        $in_collections = opensky_get_in_collections_display($object);
+
+        $display['#markup'] = $doi_link . $description . $in_collections . $metadata;
+    }
+
+}
+
+function opensky_islandora_scholar_pdf_upload_form_alter (array $form, array &$form_state) {
+        dpm ("HELLO  from opensky_islandora_scholar_pdf_upload_form_alter");
+    }
