@@ -47,7 +47,9 @@ function opensky_block_view($delta = '') {
     switch($delta) {
         case 'opensky_browse_collection_search':
             $block['subject'] = t ('Collection Search for Browse view');
-            $block['content'] = drupal_render(drupal_get_form('opensky_browse_collection_search_form'));
+            // $block['content'] = drupal_render(drupal_get_form('opensky_browse_collection_search_form'));
+            $d_form = drupal_get_form('opensky_browse_collection_search_form');
+            $block['content'] = drupal_render($d_form);
             break;
         case 'opensky_search_collection_info':
             $block['subject'] = '';
@@ -55,15 +57,21 @@ function opensky_block_view($delta = '') {
             break;
         case 'opensky_search_collection_search':
             $block['subject'] = t ('Opensky Collection Search title');
-            $block['content'] = drupal_render(drupal_get_form('opensky_search_collection_search_form'));
+            //            $block['content'] = drupal_render(drupal_get_form('opensky_search_collection_search_form'));
+            $dform = drupal_get_form('opensky_search_collection_search_form');
+            $block['content'] = drupal_render($dform);
             break;
         case 'opensky_advanced_search':
             $block['subject'] = t('OpenSky advanced search');
-             $block['content'] = drupal_render(drupal_get_form('opensky_advanced_search_form'));
+            $d_form = drupal_get_form('opensky_advanced_search_form');
+            $block['content'] = drupal_render($d_form);
+            //             $block['content'] = drupal_render(drupal_get_form('opensky_advanced_search_form'));
             break;
         case 'opensky_simple_search':
             $block['subject'] = t('OpenSky simple search');
-            $block['content'] = drupal_render(drupal_get_form('opensky_simple_search_form'));
+            //            $block['content'] = drupal_render(drupal_get_form('opensky_simple_search_form'));
+            $form = drupal_get_form('opensky_simple_search_form');
+            $block['content'] = drupal_render($form);
             break;
         case 'opensky_collection_picker_data':
             $block['subject'] = t('Opensky collection picker data');
