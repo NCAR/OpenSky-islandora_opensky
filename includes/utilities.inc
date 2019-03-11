@@ -354,9 +354,8 @@ therefore, we have to detect when we're called the second time and
 politely refuse to do anything .....
  */
 function opensky_islandora_breadcrumbs_alter(&$data, $context) {
-    //    dpm ('opensky_islandora_breadcrumbs_alter');
+    // only make change if there is a collection param
     if (!isset($_GET['collection'])) {
-        //        dpm('no collection');
         return;
     }
     $collection = $_GET['collection'];
@@ -366,7 +365,6 @@ function opensky_islandora_breadcrumbs_alter(&$data, $context) {
     foreach ($data as $crumb) {
         if (strpos($crumb, 'collection-crumb') !== false) {
             // our work is done - we've already added the collection breadcrumb
-            //            dpm ('found the collection-crumb');
             return;
         }
     }
@@ -378,8 +376,8 @@ function opensky_islandora_breadcrumbs_alter(&$data, $context) {
 
 
 /**
- * WAS Called from islandora_solr_search/includes/results.inc->setBreadcrumbs(), creates
- * the collection breadcrumb, which is inserted into breadcrumbs by the caller
+ * creates the collection breadcrumb, which is inserted into
+ * breadcrumbs by opensky_islandora_breadcrumbs_alter
  */
 function opensky_collection_breadcrumb($params) {
     $collection = $params['collection'];     
