@@ -345,28 +345,43 @@ function opensky_islandora_solr_results_alter(&$object_results, $query_processor
  * hook to insert the collection link and x_link into the breadcrumbs (see
  * islandora_solr_search/includes/results->setBreadcrumbs()
 
-the PROBLEM with this alter is that we don't have access to the info we need
-(i.e., $params). So instead of using hook_alter we use conventional function
-(opensky_collection_breadcrumb) which we call from within setBreadcrumbs..
+DON'T KNOW how to explain, but this function is getting called TWICE in a row.
+You can bracket the drupal_alter call (see islandora_solr_search/includes/results.inc
+getBreadcrumbs() with print statements and for whatever evil reason,
+opensky_islandora_breadcrumbs_alter gets called TWICE between the prints!?!?
 
+therefore, we have to detect when we're called the second time and
+politely refuse to do anything .....
  */
 function opensky_islandora_breadcrumbs_alter(&$data, $context) {
-    // dpm ('opensky_islandora_breadcrumbs_alter');
+    //    dpm ('opensky_islandora_breadcrumbs_alter');
     if (!isset($_GET['collection'])) {
-        // dsm('no collection');
+        //        dpm('no collection');
         return;
     }
     $collection = $_GET['collection'];
+
+    // Look for the collection_breadcrumb - it has a "collection-crumb" class so
+    // we just look for that string
+    foreach ($data as $crumb) {
+        if (strpos($crumb, 'collection-crumb') !== false) {
+            // our work is done - we've already added the collection breadcrumb
+            //            dpm ('found the collection-crumb');
+            return;
+        }
+    }
+    $collection_breadcrumb = opensky_collection_breadcrumb($_GET);
+
+    // splice it into existing breadcrums
+    array_splice ($data, 1, 0, $collection_breadcrumb);
 }
 
 
 /**
- * Called from islandora_solr_search/includes/results->setBreadcrumbs(), creates
+ * WAS Called from islandora_solr_search/includes/results.inc->setBreadcrumbs(), creates
  * the collection breadcrumb, which is inserted into breadcrumbs by the caller
  */
 function opensky_collection_breadcrumb($params) {
-    // dpm($params);
-    //    module_load_include('inc', 'opensky', 'includes/utilities');
     $collection = $params['collection'];     
     $dc_array = opensky_get_dc_array($collection);
     $filter_string = $dc_array['dc:title']['value'];
@@ -390,8 +405,7 @@ function opensky_collection_breadcrumb($params) {
     // remove query from path if there is one
     // $attr['href'] = url(ISLANDORA_SOLR_SEARCH_PATH, array('query' => $query_diff));
     $attr['href'] = url('/islandora/search', array('query' => $query_diff));
-    
-    
+        
     // Pull out filter (for x link).
     $query_x = array();  // query will be like current except it will not have collection param
     foreach ($params as $key => $value) {
@@ -404,7 +418,7 @@ function opensky_collection_breadcrumb($params) {
     $attr_x['href'] = url(current_path(), array('query' => $query_x));
     
     $breadcrumb = '<a' . drupal_attributes($attr) . '>' . check_plain($filter_string) . '</a>'
-                . '<span class="islandora-solr-breadcrumb-super"> <a' . drupal_attributes($attr_x) . '>('
+                . '<span class="islandora-solr-breadcrumb-super collection-crumb"> <a' . drupal_attributes($attr_x) . '>('
                 . t('x') . ')</a></span>';
     return $breadcrumb;
 }
