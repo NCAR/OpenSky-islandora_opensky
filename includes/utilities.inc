@@ -9,7 +9,8 @@ function opensky_get_pid_from_request () {
     if (substr (request_path(), 0, strlen($pat)) != $pat) {
         return null;
     }
-    $tail = array_pop(explode('/',request_path()));
+    $path_parts = explode('/', request_path());
+    $tail = array_pop($path_parts);
     $parts = explode (':', $tail);
     if (count($parts) == 2) {
         return $tail;
@@ -26,7 +27,9 @@ function opensky_get_search_term_from_request() {
         return null;
     }
 
-    $term = array_pop(explode('/',request_path()));
+    $parts = explode('/',request_path());
+    $term = array_pop($parts);
+    //    $term = array_pop(explode('/',request_path()));
     return trim($term);
 }
 
@@ -381,7 +384,7 @@ function opensky_collection_breadcrumb($params) {
     $attr = array();
     $attr['title'] = $filter_string;
     $attr['rel'] = 'nofollow';
-    if ($exclude) {
+    if (isset($exclude) && $exclude) {
         $attr['class'] = 'strikethrough';
     }
     // remove query from path if there is one
@@ -390,8 +393,11 @@ function opensky_collection_breadcrumb($params) {
     
     
     // Pull out filter (for x link).
-    $query_x = array_diff($params, array('collection'=>$collection));
-    
+    $query_x = array();  // query will be like current except it will not have collection param
+    foreach ($params as $key => $value) {
+        if ($key != 'collection' && $value == $collection) $query_x[$key] = $value;
+    }
+
     $attr_x = array();
     $attr_x['title'] = t('Remove') . ' ' . $filter_string;
     $attr_x['rel'] = 'nofollow';
@@ -452,15 +458,6 @@ function opensky_get_subcollections ($parent_arg, $recursive=false) {
 
 }
 */
-/**
- * Here we get current request stuff, but no longer have access to
- * simple/advanced search blocks
- */
-function opensky_page_alter(&$page) {
-//    dsm ('PAGE ALTER');
-//    dsm($_GET);
-//    dsm ($page);
-}
 
 /*
  * implements hook_islandora_get_view_alter
@@ -500,6 +497,18 @@ function opensky_islandora_scholar_get_view_alter(&$display, $object) {
     }
 }
 
+function opensky_retrieve_doi_markup(AbstractObject $object) {
+    $markup = '';
+    $mods_xml = simplexml_load_string($object['MODS']->content);
+    $mods_xml->registerXPathNamespace('mods', 'http://www.loc.gov/mods/v3');
+    $doi_xpath = $mods_xml->xpath('//mods:identifier[@type="doi"]');
+    if ($doi_xpath) {
+        $doi_link = (string) $doi_xpath[0];
+        $markup = 'Published Version: <a href="http://dx.doi.org/' . $doi_link . '">http://dx.doi.org/' . $doi_link . '</a> <br/> <br/>';
+    }
+    return $markup;
+}
+
 /**
  * Add "in collection" link to metadata display.
  */
@@ -512,17 +521,13 @@ function opensky_islandora_scholar_get_metadata_display_alter (&$display, $objec
         drupal_add_js('misc/collapse.js');
         $metadata = islandora_retrieve_metadata_markup($object);
         $description = islandora_retrieve_description_markup($object);
-        $doi_link = islandora_retrieve_doi_markup($object);
+        
+        $doi_link = opensky_retrieve_doi_markup($object);
 
-        // OpenSky - Insert 'in collections' display element from opensky                                                            
-        // module_load_include('inc', 'opensky', 'includes/utilities');
+        // Insert 'in collections' display element from opensky                                                            
         $in_collections = opensky_get_in_collections_display($object);
 
         $display['#markup'] = $doi_link . $description . $in_collections . $metadata;
     }
 
 }
-
-function opensky_islandora_scholar_pdf_upload_form_alter (array $form, array &$form_state) {
-        dpm ("HELLO  from opensky_islandora_scholar_pdf_upload_form_alter");
-    }
