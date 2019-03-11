@@ -25,7 +25,7 @@ function opensky_crossref_translator ($crossref_data) {
     }
     // Create MODS XML.
     $mods = new DOMDocument('1.0');
-    $mods->loadXML('<mods xmlns="http://www.loc.gov/mods/v3" xmlns:mods="http://www.loc.gov/mods/v3" xmlns:xlink="http://www.w3.org/1999/xlink"/>');
+    $mods->loadXML('<mods xmlns="http://www.loc.gov/mods/v3" xmlns:mods="http://www.loc.gov/mods/v3" xmlns:osm="http://nldr.library.ucar.edu/metadata/osm" xmlns:xlink="http://www.w3.org/1999/xlink"/>');
 
     // @todo Implement book support.
 
