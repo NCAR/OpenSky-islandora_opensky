@@ -8,6 +8,7 @@ require_once dirname(__FILE__) . '/includes/wos.inc';
 require_once dirname(__FILE__) . '/includes/kuali.inc';
 require_once dirname(__FILE__) . '/includes/citeproc_converter.inc';
 // require_once dirname(__FILE__) . '/theme/theme.inc';
+module_load_include('inc', 'opensky', 'theme/theme');
 
 /**
  * Implements hook_menu().
@@ -21,6 +22,24 @@ function opensky_menu () {
         'expanded' => TRUE,
     );
     return $items;
+}
+
+// Implement hook_theme_registry_alter
+function opensky_theme_registry_alter(&$theme_registry) {
+
+    if (!empty($theme_registry['islandora_solr_metadata_display'])) {
+        $theme_registry['islandora_solr_metadata_display']['template'] = drupal_get_path('module', 'opensky') . '/theme/opensky-solr-metadata-display'; 
+    }
+    if (!empty($theme_registry['islandora_basic_collection_wrapper'])) {
+
+        $theme_registry['islandora_basic_collection_wrapper']['template'] = drupal_get_path('module', 'opensky') . '/theme/opensky-basic-collection-wrapper'; 
+
+
+        if ($theme_registry['islandora_basic_collection_wrapper']['preprocess functions'][1] != 'template_preprocess_opensky_basic_collection_wrapper') {
+            array_splice ($theme_registry['islandora_basic_collection_wrapper']['preprocess functions'], 1, 0, 'template_preprocess_opensky_basic_collection_wrapper');
+        }        
+    }
+    //    dpm ($theme_registry['islandora_basic_collection_wrapper']);
 }
 
 /**
@@ -66,6 +85,22 @@ function opensky_theme() {
             'path' => $path . '/theme',
             'file' => $file,
             'template' => 'opensky-collection-picker-data',
+            'variables' => array (
+                'option_data' => NULL,
+            ),
+        ),
+        'opensky_solr_metadata_display' => array (
+            'path' => $path . '/theme',
+            'file' => $file,
+            'template' => 'opensky-solr-metadata-display',
+            'variables' => array (
+                'option_data' => NULL,
+            ),
+        ),
+        'opensky_basic_collection_wrapper' => array (
+            'path' => $path . '/theme',
+            'file' => $file,
+            'template' => 'opensky-basic-collection-wrapper',
             'variables' => array (
                 'option_data' => NULL,
             ),
