@@ -22,19 +22,16 @@ function template_preprocess_opensky_scratch(&$variables) {
 
 /**
  * Implements template_preprocess_HOOK().
- *
+ * If this collection does not contain subcollections, then display it as
+ * search results.
  */
-function template_preprocess_opensky_in_collections(&$variables) {
+function template_preprocess_opensky_basic_collection_wrapper(&$variables) {
 
-}
+    $islandora_object = $variables['islandora_object'];
 
-/**
- * Implements template_preprocess_HOOK().
- *
- */
-function template_preprocess_opensky_collection_picker(&$variables) {
-//    dsm('template_preprocess_opensky_collection_picker');
-//    dsm($variables);
-//    dsm (request_uri());
-//    dsm($_GET);
+    module_load_include('inc', 'opensky', 'includes/utilities');
+    if (!opensky_has_subcollections($islandora_object->id)) {
+        opensky_redirect_to_search_view($islandora_object->id);
+        return;
+    }
 }
