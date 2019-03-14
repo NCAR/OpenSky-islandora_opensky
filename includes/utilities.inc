@@ -543,3 +543,59 @@ function opensky_islandora_scholar_get_metadata_display_alter (&$display, $objec
     }
 
 }
+
+
+/*
+ * Islandora_scholar _pdf_upload_form_alter is used to upload PDF in the process
+ * of creating a new object with forms. (see includes/pdf_upload.form.inc)
+
+ * Here we simply remove the usage options from the form, and then replace the
+ * scholar module's validation function
+ * (islandora_scholar_pdf_upload_form_validate) with our own version that
+ * doesn't require the usage options.
+ */
+function opensky_form_islandora_scholar_pdf_upload_form_alter (&$form, &$form_state, $form_id) {
+    //    remove $form['upload_document']['usage']
+    unset ($form['upload_document']['usage']);
+
+    // now change the validation function
+    module_load_include ('inc', 'opensky', 'includes/utilities');
+
+    // insert opensky validate before islandora_scholar_pdf_upload_form_validate
+    //    (didn't work)
+    //    array_splice ($form['hidden_next']['#validate'], 0, 0, 'opensky_pdf_upload_form_validate'); 
+  
+    // replace islandora_scholar_pdf_upload_form_validate with opensky version
+    $form['hidden_next']['#validate'][0] = 'opensky_pdf_upload_form_validate'; 
+}
+
+/*
+ * This is a duplicate of islandora_scholar_pdf_upload_form_validate except we
+ * don't validate the usage block, since we removed these fields from form (see
+ * includes/pdf_upload.form.inc) 
+ *
+ * NOTE: I tried to do this in a more graceful way, but 
+ */
+function opensky_pdf_upload_form_validate(&$form, &$form_state) {
+    error_log ('islandora_scholar_pdf_upload_form_validate ...');
+    if ($form_state['values']['upload_pdf_checkbox']) {
+        if (empty($form_state['values']['file'])) {
+            form_set_error('file', t('A file must be uploaded!'));
+        }
+        if (empty($form_state['values']['version'])) {
+            form_set_error('version', t('A document version must be selected!'));
+        }
+
+        /*
+        // OpenSky - comment block
+        if (empty($form_state['values']['usage'])) {
+            form_set_error('usage', t('A usage permission must be selected!'));
+        }
+        // end opensky comment
+        */
+
+        if (empty($form_state['values']['certifying']['certify'])) {
+            form_set_error('certifying', t('You must certify that you have the right to upload this PDF!'));
+        }
+    } 
+}
