@@ -431,84 +431,6 @@ function opensky_get_in_collections_display ($object) {
         'parent_collections' => $parent_collections));
 }
 
-// --------- YUK --------------
-/**
- * returns a list of subcollections for the given parent_arg, which can be either a
- * collection PID, a opensky_collection_info, or a fedora_obj representing a collection.
- *
- * If the recursive param is true, then recursively find all subcollections under parent
- *
- * @param mixed $parent_arg
- * @param bool $recursive
- */
-/*
-function opensky_get_subcollections ($parent_arg, $recursive=false) {
-    // dsm('opensky_get_subcollections: $parent is a '.gettype($parent_arg));
-    $parent_obj = null;
-    switch (gettype ($parent_arg)) {
-        case 'string':
-            $parent_obj = opensky_get_fedora_object($parent_arg);
-            break;
-        case 'object':
-            $parent_obj = $parent_arg;
-            break;
-        case 'array':
-            $parent_obj = opensky_get_fedora_object($parent_arg['pid']);
-            break;
-        default:
-            // dsm('parent_arg not handled');
-    }
-    
-    $ret = array (opensky_collection_obj_to_info ($parent_obj));
-    $children = opensky_get_subcollection_infos ($parent_obj);
-    if ($recursive) {
-        foreach ($children as $child) {
-            $ret = array_merge($ret, opensky_get_subcollections($child, true));
-        }
-    }
-    return $ret;
-
-}
-*/
-
-/*
- * implements hook_islandora_get_view_alter
- * see islandora_scholar/includes/utilities islandora_scholar_get_view()
- *
- * Insert times viewed and times downloaded for islandora views
- * Customize the Download PDF link slightly
- */
-function opensky_islandora_scholar_get_view_alter(&$display, $object) {
-
-    if (module_exists('islandora_usage_stats')) {
-       module_load_include('inc', 'islandora_usage_stats', 'includes/db');
-        // using the view_count method from db.inc
-        $view_count = islandora_usage_stats_get_individual_object_view_count($object);
-        $ds_count = islandora_usage_stats_get_datastream_downloads_count($object);
-        $times_downloaded = 0;
-        if (array_key_exists('PDF',$ds_count)){
-            $times_downloaded = $ds_count['PDF'];
-        }
-        $display['view_count']['#markup'] =t("<br/>Times Viewed on OpenSky: $view_count <br/>" .
-                                             "Times Downloaded on OpenSky: $times_downloaded <br/> <br/>");
-        /* we have to assign view_count a weight that puts it inbetween
-           'preview' and 'pdf_download'
-           - the other #weight values are integers but the following seems to
-           work to put 'view_count' above 'pdf_download'
-           - note that using 'pdf_download''s exact weight also does the same thing ...
-        */
-        $display['view_count']['#weight'] = $display['pdf_download']['#weight'] - 0.5;
-    }
-
-    // Set text on download link for PDFs
-    if (isset ($display['pdf_download']['#markup'])) {
-        unset($display['pdf_download']['#title']);
-        $display['pdf_download']['#markup'] = t('Download ') . l(t('PDF'), 
-                                              "islandora/object/$object->id/datastream/PDF/download/citation.pdf") .
-                                            "<br/><br/>";
-    }
-}
-
 function opensky_retrieve_doi_markup(AbstractObject $object) {
     $markup = '';
     $mods_xml = simplexml_load_string($object['MODS']->content);
@@ -524,7 +446,7 @@ function opensky_retrieve_doi_markup(AbstractObject $object) {
 /**
  * Add "in collection" link to metadata display.
  */
-function opensky_islandora_scholar_get_metadata_display_alter (&$display, $object, $weight) {
+function opensky_islandora_scholar_get_metadata_display (&$display, $object, $weight) {
 
     if (variable_get('islandora_scholar_use_standard_metadata_display', FALSE)) {
         module_load_include('inc', 'islandora', 'includes/metadata');
@@ -543,7 +465,6 @@ function opensky_islandora_scholar_get_metadata_display_alter (&$display, $objec
     }
 
 }
-
 
 /*
  * Islandora_scholar _pdf_upload_form_alter is used to upload PDF in the process
@@ -598,4 +519,209 @@ function opensky_pdf_upload_form_validate(&$form, &$form_state) {
             form_set_error('certifying', t('You must certify that you have the right to upload this PDF!'));
         }
     } 
+}
+
+//----------------
+// Experimental - this is how we would alter ALL content model views 
+function opensky_islandora_view_object_alter (&$object, &$rendered) {
+    //    dpm ("VIEW_OBJECT_ALTER");
+    //    dpm ($object->models[0]);
+    //    dpm ($rendered);
+
+}
+
+/**
+ * Alter all citationCModel views
+ *
+ * - view and download counts
+ * - dowload PDF link
+ * - "in collections" 
+ */
+function opensky_ir_citationCModel_islandora_view_object_alter (&$object, &$rendered) {
+
+    // add viewed and downloaded counts if there is a citation.tab property in $rendered
+    if (isset($rendered['citation.tab'])) {
+        if (module_exists('islandora_usage_stats')) {
+            module_load_include('inc', 'islandora_usage_stats', 'includes/db');
+            // using the view_count method from db.inc
+            $view_count = islandora_usage_stats_get_individual_object_view_count($object);
+            $ds_count = islandora_usage_stats_get_datastream_downloads_count($object);
+            $times_downloaded = 0;
+            if (array_key_exists('PDF',$ds_count)){
+                $times_downloaded = $ds_count['PDF'];
+            }
+            $rendered['citation.tab']['view_count']['#markup'] =t("<br/>Times Viewed on OpenSky: $view_count <br/>" .
+                                                 "Times Downloaded on OpenSky: $times_downloaded");
+            /* we have to assign view_count a weight that puts it in between
+               'preview' and 'pdf_download'. the other #weight values are integers but the following seems to
+               work to put 'view_count' above 'pdf_download'. note that using 'pdf_download's exact 
+               weight also does the same thing ...
+            */
+            $rendered['citation.tab']['view_count']['#weight'] = $rendered['citation.tab']['pdf_download']['#weight'] - 0.5;
+        } 
+        
+        // Set text on download link for PDFs (see original in islandora_scholar_get_view())
+        
+        $default_viewer = variable_get('islandora_scholar_viewers');
+        $default_viewer = $default_viewer['default'];
+
+        $default_viewer = 'none';  // hard-coded here because I can't find a way to configure so it is 'none'!
+
+        if (isset($object['PDF']) && islandora_datastream_access(ISLANDORA_VIEW_OBJECTS, $object['PDF']) && $default_viewer == 'none') {
+            $filename = str_replace(":", "_", $object->id);
+            $rendered['citation.tab']['pdf_download'] = array(
+                '#type' => 'item',
+                '#markup' => t('Download ') . l(t('PDF'), "islandora/object/$object->id/datastream/PDF/download/citation.pdf"),
+                '#weight' => $rendered['citation.tab']['pdf_download']['#weight'],
+            );
+        }
+
+        // change the way "metadata" is displayed (see
+        // islandora_scholar_get_metadata_display) to include $doi_link (Published Version ..) and
+        // $in_collections
+        if (variable_get('islandora_scholar_use_standard_metadata_display', FALSE)) {
+            module_load_include('inc', 'islandora', 'includes/metadata');
+            // Borrowing core JS for fieldsets.
+            drupal_add_js('misc/form.js');
+            drupal_add_js('misc/collapse.js');
+
+            $metadata = islandora_retrieve_metadata_markup($object);
+            $description = islandora_retrieve_description_markup($object);
+            $doi_link = opensky_retrieve_doi_markup($object);
+            $in_collections = opensky_get_in_collections_display($object);
+
+            $rendered['citation.tab']['metadata']['#markup'] = $doi_link . $description . $in_collections . $metadata;
+        }        
+    }
+}
+// ---------- overriding scholar/includes/upload.tab.inc
+/**
+ * 
+ * This form is accessed via the "Document" tab for a citation object (and others??). 
+ *
+The only thing we want to modify is:
+$mods_versions = $mods_xpath->query('//m:mods/m:physicalDescription/m:note[@type="version"]');
+
+The problem is that the alter function does not have immediate access to object and hence to 
+the MODS Stream. We could get it via
+*
+*/
+function opensky_form_islandora_scholar_modify_form_alter (array &$form, array &$form_state) {
+
+    // grab object from form_state
+    $object = $form_state['build_info']['args'][0];
+    $pid = $object->id;
+    //    dpm ("pid: $pid");
+    
+    // get the version from the opensky-specific location in the MODS stream
+    $mods_str = trim($object['MODS']->content);
+
+    $mods_doc = new DOMDocument();
+    $mods_doc->loadXML($mods_str);
+    $mods_xpath = new DOMXPath($mods_doc);
+    $mods_xpath->registerNamespace('m', 'http://www.loc.gov/mods/v3');
+    $mods_versions = $mods_xpath->query('//m:mods/m:physicalDescription/m:note[@type="version"]');
+    
+    if ($mods_versions->length > 0) {
+        $version = $mods_versions->item(0)->textContent;
+        $form['version']['#markup'] = $version;
+    }
+}
+
+/**
+ * Implements hook_islandora_scholar_upload_form_alter
+ *
+ * Just like in islandora_scholar_PDF_upload_form, we want to remove 
+ * $form['upload_document']['usage'] from the form.
+ * 
+ * In this case, there is no validation function to modify, but we do replace
+ * the submit function
+*/
+function opensky_form_islandora_scholar_upload_form_alter (&$form, &$form_state, $form_id) {
+    unset ($form['upload_document']['usage']);
+
+    // we also want to change an aspect of this form's submit process (see
+    // islandora_scholar_upload_form_submit).
+
+    // We replace islandora_scholar_upload_submit because we need to change the way it 
+    // modifies the MODS with values from the form.
+
+    foreach ($form['#submit'] as $key=>$submit_fn) {
+        if ($submit_fn == 'islandora_scholar_upload_form_submit') {
+            $form['#submit'][$key] = 'opensky_upload_form_submit';
+        }}
+}
+
+/**
+
+This version of the submit function modifies the MODS with
+opensky_add_usage_and_version_elements_to_mods rather than
+islandora_scholar_add_usage_and_version_elements_to_mods
+*/
+function opensky_upload_form_submit (array $form, array &$form_state) {
+    extract($form_state['values']);
+
+    $object = islandora_object_load($pid);
+
+    try {
+        $datastream = $object->constructDatastream($dsid, 'M');
+        $datastream->label = 'PDF Datastream';
+        $datastream->mimetype = 'application/pdf';
+        $file = file_load($file);
+        $path = drupal_realpath($file->uri);
+        $datastream->setContentFromFile($path);
+
+        $object->ingestDatastream($datastream);
+
+        opensky_add_usage_and_version_elements_to_mods($object, $usage, $version);
+    }
+    catch (Exception $e) {
+        drupal_set_message(t('@message', array('@message' => check_plain($e->getMessage()))), 'error');
+    }
+}
+
+/**
+ * Replaces islandora_scholar_add_usage_and_version_elements_to_mods to
+ * implement opensky-specific ways of encoding usage and version values in MODS.
+ */
+function opensky_add_usage_and_version_elements_to_mods (AbstractObject $object, $usage, $version) {
+
+    $refuse_msg = t('Refusing to add usage and publication version statements alone');
+    if (empty($object['MODS'])) {
+        drupal_set_message(t('No MODS in object @pid. %refuse.', array('@pid' => $object->id, '%refuse' => $refuse_msg)), 'error');
+        return;
+    }
+    $namespace = 'http://www.loc.gov/mods/v3';
+    $doc = new DOMDocument();
+    $doc->loadXML($object['MODS']->content);
+    $xpath = new DOMXPath($doc);
+    $xpath->registerNamespace('mods', $namespace);
+    // Remove all instances of mods:accessCondition and mods:physicalDescription
+    // from every mods:mods element instance.
+    // OpenSky change
+    $physical_description_query = '//mods:physicalDescription';
+    $results = $xpath->query("$physical_description_query");
+    foreach ($results as $result) {
+        $result->parentNode->removeChild($result);
+    }
+    // Regardless of the number of mods:mods elements in the document we only
+    // add the usage and version to the first one.
+    $results = $xpath->query('//mods:mods[1]');
+    if ($results->length == 0) {
+        drupal_set_message(t('Could not find MODS element in object @pid is empty. %refuse.', array('@pid' => $object->id, '%refuse' => $refuse_msg)), 'error');
+        return;
+    }
+    $mods_element = $results->item(0);
+
+    #  // Add mods:physicalDescription to the first mods:mods element.
+    $physical_description_element = $doc->createElementNS($namespace, 'physicalDescription');
+
+    $physical_description_note_element = $doc->createElementNS($namespace, 'note');
+    $physical_description_note_element->setAttribute('type', 'version');
+    $physical_description_note_element->nodeValue = $version;
+    $physical_description_element->appendChild($physical_description_note_element);
+    $mods_element->appendChild($physical_description_element);
+
+    // Commit changes to datastream.
+    $object['MODS']->setContentFromString($doc->saveXML());
 }
