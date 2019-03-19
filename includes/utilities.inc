@@ -725,3 +725,198 @@ function opensky_add_usage_and_version_elements_to_mods (AbstractObject $object,
     // Commit changes to datastream.
     $object['MODS']->setContentFromString($doc->saveXML());
 }
+
+/* ----- islandora_scholar_embargo module alterations
+
+   The two functions below encapsulate the opensky modifications to the embargo
+   module. 
+
+   - opensky_form_islandora_scholar_embargo_form_alter introduces some "Embargo
+     Options" beyond those supplied, and it also replaces
+     islandora_scholar_embargo_form_submit with opensky_embargo_form_submit
+     (which is a verbatim copy of the modified
+     islandora_scholar_embargo_form_submit)
+
+    - NOTE: the modified embargo did not work properly in its former location in
+      islandora_scholar_embargo and it does not work properly here. Library
+      personal report that PDF embargo might work, but other levels and
+      durations of embargo are not used because they don't work properly. This
+      is an area of functionality that will have to be fixed after OpenSky is
+      hosted at Discovery Garden.
+*/
+
+/**
+ * Recalculate the "Embargo Options" with opensky-specific values. We allow:
+ * - 'object'
+ * - 'PDF'
+ * - 'OBJ'
+ * - 'PROXY_MP3'
+ */
+function opensky_form_islandora_scholar_embargo_form_alter (&$form, &$form_state, $form_id) {
+    //    dpm ('opensky_form_islandora_scholar_embargo_form_alter');
+
+    $options = array(
+        'object' => t('Object-level embargo'),
+        'datastream' => t('Datastream'),
+    );
+
+    // add options for the object datastreams
+    $pid = $form['pid']['#value'];
+    $object = islandora_object_load($pid);
+    foreach ($object as $datastream) {
+        $options[$datastream->id] = $datastream->label;
+    }
+
+    // allowable options - these are the only "embargop options" allowed in opensky
+    $allowed_options = array (
+        'object' => '',
+        'PDF' => '',    // OPenSky added PDF to original 
+        'OBJ' => '',
+        'PROXY_MP3' => '',
+    );
+
+    // reduce options to those allowable
+    $options = array_intersect_key($options, $allowed_options);
+    $form['dsid']['#options'] = $options;
+
+    // stick opensky form submit handler in before islandora_scholar version
+    module_load_include('inc', 'opensky', 'includes/utilities');
+    //    array_splice ($form['#submit'], 0, 0, 'opensky_embargo_form_submit');
+
+  
+    $form['#submit'] = array('opensky_embargo_form_submit');
+
+    // dpm ($form);
+
+}
+
+/**
+ * We make enough opensky-specific changes to
+ * islandora_scholar_embargo_form_submit that we have to copy the islandora_scholar 
+ * function here and modify it, thus replacing it with opensky_embargo_form_submit
+ */
+function opensky_embargo_form_submit (array $form, array &$form_state) {
+    //    dpm ('opensky_embargo_form_submit');
+    $embargoed = !empty($form_state['islandora_embargo']);
+    $pid = $form_state['values']['pid'];
+    $object = islandora_object_load($pid);
+    // We are lifting an embargo from an object that already has one.
+    if (isset($form_state['values']['update_options']) && $form_state['values']['update_options'] === 'lift_embargo') {
+        $dsids = array();
+
+        // This will have to be re-defined if and when we decide to allow
+        // multiple separate embargoing on an object likely by using this
+        // function: islandora_scholar_embargo_lift_associated_except(). For now
+        // we can only have one embargo.
+
+        foreach ($form_state['islandora_embargo'] as $embargo_vals) {
+            $type = $embargo_vals['type'];
+            if ($type !== 'Object') {
+                $dsids[] = $type;
+            }
+            // OpenSky
+            islandora_scholar_embargo_lift_embargo($pid, $dsids);
+            // If an embargo on audio datastream, also remove the embargo on the
+            // OBJ datastream
+            if ($dsids == 'PROXY_MP3') {
+                islandora_scholar_embargo_lift_embargo($pid, 'OBJ');
+            }
+            drupal_set_message(t('The embargo on @label (@pid) has been lifted!', array(
+                '@label' => $object->label,
+                '@pid' => $pid,
+            )));
+            // end OpenSky
+        }
+        // Batch down and down and down.
+        if (isset($form_state['values']['recurse']) && $form_state['values']['recurse']) {
+            $option = $form_state['values']['recurse_options'];
+            $query_array = $form_state['query_choices'][$option];
+            $batch = array(
+                'title' => t('Lifting Embargoes'),
+                'progress_message' => t('Please wait if many objects are being updated this could take a few minutes.'),
+                'operations' => array(
+                    array(
+                        'islandora_scholar_embargo_lift_batch_function',
+                        array($pid, $dsids, $query_array),
+                    ),
+                ),
+                'finished' => 'islandora_scholar_embargo_lift_batch_finished',
+                'file' => drupal_get_path('module', 'islandora_scholar_embargo') . '/includes/batch.inc',
+            );
+            batch_set($batch);
+        }
+        islandora_scholar_embargo_lift_embargo($pid, $dsids);
+        drupal_set_message(t('The embargo on @label (@pid) has been lifted!', array(
+            '@label' => $object->label,
+            '@pid' => $pid,
+        )));
+    }
+    elseif (isset($form_state['values']['update_date_options'])) {
+        // Embargoed indefinitely.
+        if ($form_state['values']['update_date_options'] === 'indefinite_embargo') {
+            $end = 'indefinite';
+        }
+        else {
+            $time = $form_state['values']['embargo_date'];
+            $date_string = $time['year'] . '-' . $time['month'] . '-' . $time['day'];
+            $end = gmdate("Y-m-d\TH:i:s\Z", strtotime($date_string));
+        }
+
+        // Object is currently embargoed and we are updating things.
+        if ($embargoed) {
+            $dsids = array();
+            foreach ($form_state['islandora_embargo'] as $embargo_vals) {
+                $type = $embargo_vals['type'];
+                if ($embargo_vals['type'] == 'Object') {
+                    $dsids = NULL;
+                }
+                else {
+                    $dsids[] = $type;
+                }
+            }
+        }
+        // New embargo entry.
+        else {
+            if ($form_state['values']['dsid'] === 'object') {
+                $dsids = NULL;
+            }
+            else {
+                // OpenSky
+                //        $dsid_options =
+                //        array_filter($form_state['values']['ds_options']);
+                //        $other_options = array();
+                //        if ($form_state['values']['ds_options_other']) {
+                //          $other_options =
+                //        drupal_map_assoc(array_values(array_filter(preg_split('/[,|\s]/',
+                //        trim($form_state['values']['ds_other'])))));
+                //        }
+                //        $dsids = array_unique(array_merge($dsid_options, $other_options));
+                $dsids = (array)$form_state['values']['dsid'];
+                // end OpenSky
+            }
+        }
+        // Currently we just overwrite what's already in place. In the future, for
+        // multiple embargoes on a single object, this will have to be adjusted.
+
+        // If we're recursing do those objects in a batch.
+        if (isset($form_state['values']['recurse']) && $form_state['values']['recurse'] && $form_state['values']['recurse_options'] != 'newchildren') {
+            $option = $form_state['values']['recurse_options'];
+            $query_array = $form_state['query_choices'][$option];
+            $batch = array(
+                'title' => t('Updating Embargoes'),
+                'progress_message' => t('Please wait if many objects are being updated this could take a few minutes.'),
+                'operations' => array(
+                    array(
+                        'islandora_scholar_embargo_apply_batch_function',
+                        array($pid, $dsids, $end, $query_array),
+                    ),
+                ),
+                'finished' => 'islandora_scholar_embargo_apply_batch_finished',
+                'file' => drupal_get_path('module', 'islandora_scholar_embargo') . '/includes/batch.inc',
+            );
+            batch_set($batch);
+        }
+        islandora_scholar_embargo_set_embargo($pid, $dsids, $end);
+        islandora_scholar_embargo_set_display_message($pid, $dsids, $end);
+    }
+}
