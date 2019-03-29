@@ -26,20 +26,37 @@ function opensky_menu () {
 
 // Implement hook_theme_registry_alter
 function opensky_theme_registry_alter(&$theme_registry) {
-
+    
+    // islandora_solr_metadata
     if (!empty($theme_registry['islandora_solr_metadata_display'])) {
         $theme_registry['islandora_solr_metadata_display']['template'] = drupal_get_path('module', 'opensky') . '/theme/opensky-solr-metadata-display'; 
     }
+    // islandora_basic_collection
     if (!empty($theme_registry['islandora_basic_collection_wrapper'])) {
-
         $theme_registry['islandora_basic_collection_wrapper']['template'] = drupal_get_path('module', 'opensky') . '/theme/opensky-basic-collection-wrapper'; 
-
-
         if ($theme_registry['islandora_basic_collection_wrapper']['preprocess functions'][1] != 'template_preprocess_opensky_basic_collection_wrapper') {
             array_splice ($theme_registry['islandora_basic_collection_wrapper']['preprocess functions'], 1, 0, 'template_preprocess_opensky_basic_collection_wrapper');
         }        
     }
-    //    dpm ($theme_registry['islandora_basic_collection_wrapper']);
+    // islandora_openseadragon
+    if (!empty($theme_registry['islandora_openseadragon_clipper'])) {
+        unset ($theme_registry['islandora_openseadragon_clipper']);
+        //        dpm ('islandora_openseadragon_clipper unset');
+    } 
+    if (!empty($theme_registry['islandora_openseadragon_viewer'])) {
+
+        // Replace "template_process_islandora_openseadragon_viewer" with
+        // 'opensky_template_process_islandora_openseadragon_viewer' so we can
+        // change the javascript for jstilesource.js
+        foreach ($theme_registry['islandora_openseadragon_viewer']['process functions'] as $key=>$function_name) {
+            if ($function_name === 'template_process_islandora_openseadragon_viewer') {
+                $theme_registry['islandora_openseadragon_viewer']['process functions'][$key] = 'opensky_template_process_islandora_openseadragon_viewer';
+            }
+        }
+        // stick opensky function on end of process functions array
+        //         $theme_registry['islandora_openseadragon_viewer']['process functions'][] = 'opensky_template_process_islandora_openseadragon_viewer';
+        dpm ($theme_registry['islandora_openseadragon_viewer']);
+    }
 }
 
 /**

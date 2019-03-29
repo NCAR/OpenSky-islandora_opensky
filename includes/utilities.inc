@@ -920,3 +920,25 @@ function opensky_embargo_form_submit (array $form, array &$form_state) {
         islandora_scholar_embargo_set_display_message($pid, $dsids, $end);
     }
 }
+// ------- openseadragon
+function opensky_template_process_islandora_openseadragon_viewer (array &$variables) {
+    dpm ('opensky_template_process_islandora_openseadragon_viewer');
+    dpm ($variables);
+
+    $library_path = libraries_get_path('openseadragon');
+    $openseadragon_module_path = drupal_get_path('module', 'islandora_openseadragon');
+    $opensky_module_path = drupal_get_path('module', 'opensky');
+
+    drupal_add_js(array(
+        'islandoraOpenSeadragon' => $variables['settings'],
+    ), 'setting');
+
+    drupal_add_js("$library_path/openseadragon.js", array('weight' => -4));
+    // CHANGE JS FILE for OPENSKY!
+    if (islandora_openseadragon_use_djatoka_server()) {
+        //        drupal_add_js("$openseadragon_module_path/js/djtilesource.js", array('weight' => -3));
+        drupal_add_js("$opensky_module_path/js/openseadragon_djtilesource.js", array('weight' => -3));
+    }
+    drupal_add_js("$openseadragon_module_path/js/islandora_openseadragon.js", array('weight' => -2));
+    drupal_add_css("$openseadragon_module_path/css/islandora_openseadragon.theme.css");
+}
