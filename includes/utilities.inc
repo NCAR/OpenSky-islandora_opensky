@@ -438,7 +438,7 @@ function opensky_retrieve_doi_markup(AbstractObject $object) {
     $doi_xpath = $mods_xml->xpath('//mods:identifier[@type="doi"]');
     if ($doi_xpath) {
         $doi_link = (string) $doi_xpath[0];
-        $markup = 'Published Version: <a href="http://dx.doi.org/' . $doi_link . '">http://dx.doi.org/' . $doi_link . '</a> <br/> <br/>';
+        $markup = 'Published Version: <a href="https://doi.org/' . $doi_link . '">https://doi.org/' . $doi_link . '</a> <br/> <br/>';
     }
     return $markup;
 }
